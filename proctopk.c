@@ -6,6 +6,18 @@
 #include <sys/ipc.h>
 #include <sys/shm.h>
 
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <string.h>
+
+#define MAX_WORD_LEN 64
+
+typedef struct {
+    char word[MAX_WORD_LEN];
+    int frequency;
+} WordFreqPair;
+
 int main() {
 
     int k = 5; // numebr of words to find
@@ -14,6 +26,8 @@ int main() {
     char inFile1[] = "in1.txt";  // input file name
     char inFile2[] = "in2.txt";  // input file name
     char inFile3[] = "in3.txt";  // input file name
+    
+    int shm_size = n * k * sizeof(WordFreqPair);
 
     char inputFiles[3][20] = {
         "in1.txt",
@@ -21,27 +35,28 @@ int main() {
         "in3.txt"
     };
 
-    // Shared memory
-    int shmid;
-    key_t key = 1234;
-    char *shared_memory;
-    char *data = "Hello, world!";
-
-    // Create shared memory segment
-    shmid = shmget(key, 1024, 0666 | IPC_CREAT);
-    if (shmid == -1) {
-        perror("shmget");
-        exit(1);
-    }
-
-    // Attach shared memory segment to parent process
-    shared_memory = shmat(shmid, NULL, 0);
-    if (shared_memory == (char *) -1) {
-        perror("shmat");
-        exit(1);
-    }
-
+    int shm_fd;
+    char *shm_ptr;
     pid_t pid;
+    WordFreqPair (*wordFreqPairs)[k];
+
+
+    // create a shared memory object
+    shm_fd = shm_open("/myshm", O_CREAT | O_RDWR, 0666);
+    if (shm_fd == -1) {
+        perror("shm_open");
+        exit(1);
+    }
+
+    // configure the size of the shared memory object
+    ftruncate(shm_fd, sizeof(WordFreqPair[n][k]));
+
+    // map the shared memory object into the address space of this process
+    wordFreqPairs = mmap(NULL, shm_size, PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
+    if (wordFreqPairs == MAP_FAILED) {
+        perror("mmap");
+        exit(1);
+    }   
 
     for (int i=0; i<n; i++) {
         pid = fork();
@@ -53,9 +68,10 @@ int main() {
             // This is the child process
             printf("Hello from child process!\n");
 
+            // Read file
             FILE *fp;
             char line[100];
-            char *word;
+            char word[MAX_WORD_LEN];
 
             fp = fopen(inputFiles[i], "r");
             if (fp == NULL) {
@@ -63,30 +79,67 @@ int main() {
                 return 1;
             }
 
-            fgets(line, 100, fp);
-            word = strtok(line, " \t\n");
-            while (word != NULL) {
+            while (fscanf(fp, "%s", word) != EOF) {
                 printf("Word: %s\n", word);
-                word = strtok(NULL, " \t\n");
             }
 
             fclose(fp);
+            
+            for (int j = 0; j < k; j++) {
+                WordFreqPair pair;
+                // initialize the members of the struct
+                strncpy(pair.word, "example", MAX_WORD_LEN);
+                pair.frequency = i*j;
+
+                // child process writes to the shared memory
+                wordFreqPairs[i][j] = pair;
+            }
+
+            // unmap the shared memory object from the child process
+            if (munmap(wordFreqPairs, shm_size) == -1) {
+                perror("munmap");
+                exit(1);
+            }
 
             return 0;
         } else {
+            // parent process waits for the child to finish
+            wait(NULL);
+
             // This is the parent process
             printf("Hello from parent process!\n");
-
-            int status;
-            waitpid(pid, &status, 0);
-
-            if (WIFEXITED(status)) {
-                printf("Child process exited with status %d\n", WEXITSTATUS(status));
-            }
         }
 
     }
 
+    // parent process waits for the child to finish
+    wait(NULL);
+
+    for (int i = 0; i < n; i++) {
+        for (int j = 0; j < k; j++) {
+            // read from the shared memory object
+            printf("Received message word : %s\n", wordFreqPairs[i][j].word);
+            printf("Received message freq : %d\n", wordFreqPairs[i][j].frequency);
+        }
+    }
+
+    // unmap the shared memory object from the parent process
+    if (munmap(wordFreqPairs, shm_size) == -1) {
+        perror("munmap");
+        exit(1);
+    }
+
+    // close the shared memory object
+    if (close(shm_fd) == -1) {
+        perror("close");
+        exit(1);
+    }
+
+    // remove the shared memory object
+    if (shm_unlink("/myshm") == -1) {
+        perror("shm_unlink");
+        exit(1);
+    }
 
     return 0;
 }
