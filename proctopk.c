@@ -12,15 +12,94 @@
 #include <string.h>
 
 #define MAX_WORD_LEN 64
+#define MAX_NUM_WORDS 1000
 
 typedef struct {
     char word[MAX_WORD_LEN];
     int frequency;
 } WordFreqPair;
 
-int main() {
 
-    int k = 5; // numebr of words to find
+int hash(char *word) {
+    int hashedRes = 0;
+    while (*word != '\0') {
+        hashedRes = (hashedRes* 31 + *word) % MAX_NUM_WORDS;
+        word++;
+    }
+    return hashedRes;
+}
+
+
+int main( int argc, char* argv[] ) {
+    //HASH IMPLEMENTATION
+    FILE* filepointer;
+    char word[MAX_WORD_LEN];
+    WordFreqPair hashTable[MAX_NUM_WORDS];
+
+    filepointer = fopen(argv[1],"r");
+    if ( filepointer == NULL ) {
+        printf("ERROR, FILE CANT BE OPENED!");
+        return  1;
+    }
+
+
+
+    //Initialize all elements
+    for ( int i = 0; i < MAX_NUM_WORDS; i++ ) {
+        hashTable[i].word[0] = '\0'; //Set first characters to null so that any word is empty for now.
+        hashTable[i].frequency = 0;
+    }
+
+    //Read the file and count words
+    int noOfWords = 0;
+    while (fscanf(filepointer, "%s", word) != EOF ) {
+        int h = hash(word);
+        if ( hashTable[h].word[0] == '\0') {
+            strncpy(hashTable[h].word, word, MAX_WORD_LEN);
+            hashTable[h].frequency = 1;
+            noOfWords++;
+        } else if (strcmp(hashTable[h].word, word) == 0) {
+            // increment frequency count for existing word
+            hashTable[h].frequency++;
+        } else {
+            // handle hash collision by linear probing
+            for (int j = (h + 1) % MAX_NUM_WORDS; j != h; j = (j + 1) % MAX_NUM_WORDS) {
+                if ( hashTable[j].word[0] == '\0') {
+                    strncpy( hashTable[j].word, word, MAX_WORD_LEN);
+                    hashTable[j].frequency= 1;
+                    noOfWords++;
+                    break;
+                } else if (strcmp(hashTable[j].word, word) == 0) {
+                    hashTable[j].frequency++;
+                    break;
+                }
+            }
+        }
+    }
+
+    fclose(filepointer);
+
+    // sort table in descending order
+    int maxFreq;
+
+    for ( int i = 0; i < noOfWords; i++) {
+        maxFreq = hashTable[i].frequency;
+        for ( int j = i + 1; j < noOfWords; j++) {
+            if ( hashTable[j].frequency > maxFreq) {
+                WordFreqPair tmp = hashTable[i];
+                hashTable[i] = hashTable[j];
+                hashTable[j] = tmp;
+                maxFreq = hashTable[i].frequency;
+            }
+        }
+    }
+
+// output top K words and their frequency counts
+   // for (int i = 0; i < k && i < noOfWords; i++) {
+     //   printf("%s %d\n",  hashTable[i].word, hashTable[i].frequency);
+    //}
+
+    int k = 5; // number of words to find
     char outFile[] = "output.txt";  // output file name
     int n = 3; // number of input files
     char inFile1[] = "in1.txt";  // input file name
