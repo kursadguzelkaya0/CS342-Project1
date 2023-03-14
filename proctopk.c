@@ -31,40 +31,40 @@ int hash(char *word) {
 }
 
 void readAndCreateHashTable(char* filename, int* noOfWords, WordFreqPair** hashTable) {
-     //HASH IMPLEMENTATION
-    FILE* filepointer;
+
+    // Read file
+    FILE *fp;
     char word[MAX_WORD_LEN];
 
-    printf("1111111111\n");
-    printf("%s",filename);
-
-
-
-    filepointer = fopen(filename,"r");
-    if ( filepointer == NULL ) {
-        printf("ERROR, FILE CANT BE OPENED!");
-    }
 
     //Initialize all elements
     for ( int i = 0; i < MAX_NUM_WORDS; i++ ) {
         (*hashTable)[i].word[0] = '\0'; //Set first characters to null so that any word is empty for now.
+        
         (*hashTable)[i].frequency = 0;
     }
 
-    printf("22222\n");
+
+    fp = fopen(filename, "r");
+    if (fp == NULL) {
+        printf("Failed to open file\n");
+    }
+
 
     //Read the file and count words
-    *noOfWords = 0;
-    while (fscanf(filepointer, "%s", word) != EOF ) {
+    (*noOfWords) = 0;
+    while (fscanf(fp, "%s", word) != EOF) {
         for(int i = 0; word[i]; i++) {
             word[i] = toupper(word[i]);
         }
 
-        printf("%s",word);
+        printf("Word: %s\n", word);
 
         int h = hash(word);
         if ( (*hashTable)[h].word[0] == '\0') {
-            strncpy((*hashTable)[h].word, word, MAX_WORD_LEN);
+            strcpy((*hashTable)[h].word, word);
+            printf("Word1: %s\n", word);
+
             (*hashTable)[h].frequency = 1;
             *noOfWords = *noOfWords + 1;
         } else if (strcmp((*hashTable)[h].word, word) == 0) {
@@ -74,7 +74,9 @@ void readAndCreateHashTable(char* filename, int* noOfWords, WordFreqPair** hashT
             // handle hash collision by linear probing
             for (int j = (h + 1) % MAX_NUM_WORDS; j != h; j = (j + 1) % MAX_NUM_WORDS) {
                 if ( (*hashTable)[j].word[0] == '\0') {
-                    strncpy( (*hashTable)[j].word, word, MAX_WORD_LEN);
+                    strcpy( (*hashTable)[j].word, word);
+                    printf("Word2: %s\n", word);
+
                     (*hashTable)[j].frequency= 1;
                     *noOfWords = *noOfWords + 1;
 
@@ -87,7 +89,7 @@ void readAndCreateHashTable(char* filename, int* noOfWords, WordFreqPair** hashT
         }
     }
 
-    fclose(filepointer);
+    fclose(fp);
 }
 
 
@@ -148,7 +150,7 @@ int main( int argc, char* argv[] ) {
             // This is the child process
             printf("Hello from child process!\n");
 
-            WordFreqPair* hashTable;
+            WordFreqPair* hashTable = (WordFreqPair*) malloc(MAX_NUM_WORDS*sizeof(char*));
             int noOfWords;
 
             printf("%s\n", inputFiles[i]);
@@ -160,11 +162,9 @@ int main( int argc, char* argv[] ) {
             // sort table in descending order
             int maxFreq;
 
-            for ( int i = 0; i < noOfWords; i++) {
+            for ( int i = 0; i < MAX_NUM_WORDS; i++) {
                 maxFreq = hashTable[i].frequency;
-                for ( int j = i + 1; j < noOfWords; j++) {
-                     printf("word : %s\n", hashTable[j].word);
-                    printf("freq : %d\n", hashTable[j].frequency);
+                for ( int j = i + 1; j < MAX_NUM_WORDS; j++) {
                     if ( hashTable[j].frequency > maxFreq) {
                         WordFreqPair tmp = hashTable[i];
                         hashTable[i] = hashTable[j];
