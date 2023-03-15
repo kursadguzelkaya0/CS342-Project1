@@ -3,17 +3,13 @@
 #include <sys/wait.h>
 #include <string.h>
 #include <stdlib.h>
-#include <sys/ipc.h>
-#include <sys/shm.h>
 #include <ctype.h>
-
 #include <sys/mman.h>
-#include <sys/stat.h>
 #include <fcntl.h>
-#include <string.h>
 
 #define MAX_WORD_LEN 64
 #define MAX_NUM_WORDS 1000
+#define SNAME "/myshm"
 
 typedef struct {
     char word[MAX_WORD_LEN];
@@ -56,12 +52,7 @@ void readAndCreateHashTable(char* filename, int* noOfWords, WordFreqPair** hashT
         for(int i = 0; word[i]; i++) {
             word[i] = toupper(word[i]);
         }
-
-        printf("Word in 11111: %s\n", word);
-
         int h = hash(word);
-
-        printf("Hash in 11111: %d\n", h);
 
         if ( (*hashTable)[h].word[0] == '\0') {
             strcpy((*hashTable)[h].word, word);
@@ -88,8 +79,6 @@ void readAndCreateHashTable(char* filename, int* noOfWords, WordFreqPair** hashT
             }
         }
     }
-
-
     fclose(fp);
 }
 
@@ -128,23 +117,21 @@ int main( int argc, char* argv[] ) {
         "in3.txt"
     };
 
-    
 
     int shm_fd;
-    char *shm_ptr;
     pid_t pid;
     WordFreqPair (*wordFreqPairs)[k];
 
 
     // create a shared memory object
-    shm_fd = shm_open("/myshm", O_CREAT | O_RDWR, 0666);
+    shm_fd = shm_open(SNAME, O_CREAT | O_RDWR, 0666);
     if (shm_fd == -1) {
         perror("shm_open");
         exit(1);
     }
 
     // configure the size of the shared memory object
-    ftruncate(shm_fd, sizeof(WordFreqPair[n][k]));
+    ftruncate(shm_fd, shm_size );
 
     // map the shared memory object into the address space of this process
     wordFreqPairs = mmap(NULL, shm_size, PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
@@ -167,14 +154,6 @@ int main( int argc, char* argv[] ) {
             int noOfWords;
 
             readAndCreateHashTable(inputFiles[i], &noOfWords, &hashTable);
-
-
-
-            for (int j = 0; j < MAX_NUM_WORDS; j++) {
-                if(hashTable[j].word[0] == '\0') {
-                    hashTable[j].frequency = 0;
-                }
-            }
         
             sortHashTable(&hashTable);    
             
@@ -208,12 +187,65 @@ int main( int argc, char* argv[] ) {
     // parent process waits for the child to finish
     wait(NULL);
 
-    for (int i = 0; i < n; i++) {
-        for (int j = 0; j < k; j++) {
-            // read from the shared memory object
-            printf("Received message word : %s\n", wordFreqPairs[i][j].word);
-            printf("Received message freq : %d\n", wordFreqPairs[i][j].frequency);
+    //Initialize parentTable to find top K words
+    WordFreqPair* parentTable = ( WordFreqPair* ) malloc( n*k*sizeof(WordFreqPair) );
+    int tableSize = n*k;
+
+    for ( int i = 0; i < tableSize; i++ ) {
+        parentTable[i].word[0] = '\0'; //Set first characters to null so that any word is empty for now.
+        parentTable[i].frequency = 0;
+    }
+
+    //Read the shared memory and count words
+    int wordCount = 0;
+    for ( int i = 0;  i <n; i++ ) {
+        for ( int j = 0; j <k; j++ ) {
+
+            char* word = wordFreqPairs[i][j].word;
+            int freq = wordFreqPairs[i][j].frequency;
+            int h = hash(word);
+
+            if ( (parentTable)[h].word[0] == '\0') {
+                strcpy((parentTable)[h].word, word);
+
+                (parentTable)[h].frequency = freq;
+                wordCount = wordCount + 1;
+            } else if (strcmp((parentTable)[h].word, word) == 0) {
+                // increment frequency count for existing word
+                parentTable[h].frequency = parentTable[h].frequency + freq ;
+            } else {
+                // handle hash collision by linear probing
+                for (int j = (h + 1) % MAX_NUM_WORDS; j != h; j = (j + 1) % MAX_NUM_WORDS) {
+                    if ( (parentTable)[j].word[0] == '\0') {
+                        strcpy( (parentTable)[j].word, word);
+
+                        (parentTable)[j].frequency= 1;
+                        wordCount = wordCount + 1;
+
+                        break;
+                    } else if (strcmp((parentTable)[j].word, word) == 0) {
+                        parentTable[h].frequency = parentTable[h].frequency + freq ;
+                        break;
+                    }
+                }
+            }
         }
+    }
+
+    //Sort table
+    sortHashTable(&parentTable);
+    //Time to output
+    FILE* ofp;
+    ofp = fopen("output.txt", "w");
+
+    if (ofp == NULL) {
+        printf("Error opening file!\n");
+        return 1;
+    }
+
+    for (int i = 0; i < wordCount; i++) {
+            fprintf(ofp,"%s", parentTable[i].word);
+            fprintf(ofp," %d\n", parentTable[i].frequency);
     }
 
     // unmap the shared memory object from the parent process
@@ -229,7 +261,7 @@ int main( int argc, char* argv[] ) {
     }
 
     // remove the shared memory object
-    if (shm_unlink("/myshm") == -1) {
+    if (shm_unlink(SNAME) == -1) {
         perror("shm_unlink");
         exit(1);
     }
