@@ -103,13 +103,12 @@ void sortHashTable(WordFreqPair** hashTable) {
 int main( int argc, char* argv[] ) {
 
     int k = 5; // number of words to find
-    char outFile[] = "output.txt";  // output file name
     int n = 3; // number of input files
     char inFile1[] = "in1.txt";  // input file name
     char inFile2[] = "in2.txt";  // input file name
     char inFile3[] = "in3.txt";  // input file name
     
-    int shm_size = n * k * sizeof(WordFreqPair);
+    long shm_size = n * k * sizeof(WordFreqPair);
 
     char inputFiles[3][20] = {
         "in1.txt",
@@ -215,16 +214,16 @@ int main( int argc, char* argv[] ) {
                 parentTable[h].frequency = parentTable[h].frequency + freq ;
             } else {
                 // handle hash collision by linear probing
-                for (int j = (h + 1) % MAX_NUM_WORDS; j != h; j = (j + 1) % MAX_NUM_WORDS) {
-                    if ( (parentTable)[j].word[0] == '\0') {
-                        strcpy( (parentTable)[j].word, word);
+                for (int a = (h + 1) % MAX_NUM_WORDS; a != h; a = (a + 1) % MAX_NUM_WORDS) {
+                    if ( (parentTable)[a].word[0] == '\0') {
+                        strcpy( (parentTable)[a].word, word);
 
-                        (parentTable)[j].frequency= 1;
+                        (parentTable)[a].frequency= 1;
                         wordCount = wordCount + 1;
 
                         break;
-                    } else if (strcmp((parentTable)[j].word, word) == 0) {
-                        parentTable[h].frequency = parentTable[h].frequency + freq ;
+                    } else if (strcmp((parentTable)[a].word, word) == 0) {
+                        parentTable[a].frequency = parentTable[a].frequency + freq ;
                         break;
                     }
                 }
