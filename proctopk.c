@@ -44,7 +44,6 @@ void readAndCreateHashTable(char* filename, int* noOfWords, WordFreqPair** hashT
         (*hashTable)[i].frequency = 0;
     }
 
-
     fp = fopen(filename, "r");
     if (fp == NULL) {
         printf("Failed to open file\n");
@@ -63,7 +62,6 @@ void readAndCreateHashTable(char* filename, int* noOfWords, WordFreqPair** hashT
         int h = hash(word);
         if ( (*hashTable)[h].word[0] == '\0') {
             strcpy((*hashTable)[h].word, word);
-            printf("Word1: %s\n", word);
 
             (*hashTable)[h].frequency = 1;
             *noOfWords = *noOfWords + 1;
@@ -90,6 +88,23 @@ void readAndCreateHashTable(char* filename, int* noOfWords, WordFreqPair** hashT
     }
 
     fclose(fp);
+}
+
+void sortHashTable(WordFreqPair** hashTable) {
+    // sort table in descending order
+    int maxFreq;
+
+    for ( int i = 0; i < MAX_NUM_WORDS; i++) {
+        maxFreq = (*hashTable)[i].frequency;
+        for ( int j = i + 1; j < MAX_NUM_WORDS; j++) {
+            if ( (*hashTable)[j].frequency > maxFreq) {
+                WordFreqPair tmp = (*hashTable)[i];
+                (*hashTable)[i] = (*hashTable)[j];
+                (*hashTable)[j] = tmp;
+                maxFreq = (*hashTable)[i].frequency;
+            }
+        }
+    }
 }
 
 
@@ -153,26 +168,15 @@ int main( int argc, char* argv[] ) {
             WordFreqPair* hashTable = (WordFreqPair*) malloc(MAX_NUM_WORDS*sizeof(char*));
             int noOfWords;
 
-            printf("%s\n", inputFiles[i]);
-
             readAndCreateHashTable(inputFiles[i], &noOfWords, &hashTable);
 
-            printf("Hello from child process asödklşiakspdğaksopdkapsdkoğapsğd!\n");
-        
-            // sort table in descending order
-            int maxFreq;
-
-            for ( int i = 0; i < MAX_NUM_WORDS; i++) {
-                maxFreq = hashTable[i].frequency;
-                for ( int j = i + 1; j < MAX_NUM_WORDS; j++) {
-                    if ( hashTable[j].frequency > maxFreq) {
-                        WordFreqPair tmp = hashTable[i];
-                        hashTable[i] = hashTable[j];
-                        hashTable[j] = tmp;
-                        maxFreq = hashTable[i].frequency;
-                    }
+            for (int j = 0; j < MAX_NUM_WORDS; j++) {
+                if(hashTable[j].word[0] == '\0') {
+                    hashTable[j].frequency = 0;
                 }
             }
+        
+            sortHashTable(&hashTable);    
             
             for (int j = 0; j < k; j++) {
                 printf("word : %s\n", hashTable[j].word);
