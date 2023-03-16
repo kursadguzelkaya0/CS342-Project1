@@ -2,9 +2,12 @@
 #include <pthread.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
+
 
 
 #define MAX_WORD_LEN 64
+#define MAX_NUM_WORDS 1000
 
 typedef struct {
     char word[MAX_WORD_LEN];
@@ -18,6 +21,89 @@ typedef struct {
     int K;
 } ThreadArgs;
 
+
+int hash(char *word) {
+    int hashedRes = 0;
+    while (*word != '\0') {
+        hashedRes = (hashedRes* 31 + *word) % MAX_NUM_WORDS;
+        word++;
+    }
+    return hashedRes;
+}
+
+void readAndCreateHashTable(char* filename, int* noOfWords, WordFreqPair** hashTable) {
+
+    // Read file
+    FILE *fp;
+    char word[MAX_WORD_LEN];
+
+
+    //Initialize all elements
+    for ( int i = 0; i < MAX_NUM_WORDS; i++ ) {
+        (*hashTable)[i].word[0] = '\0'; //Set first characters to null so that any word is empty for now.
+        
+        (*hashTable)[i].frequency = 0;
+    }
+
+    fp = fopen(filename, "r");
+    if (fp == NULL) {
+        printf("Failed to open file\n");
+    }
+
+
+    //Read the file and count words
+    (*noOfWords) = 0;
+    while (fscanf(fp, "%s", word) != EOF) {
+        for(int i = 0; word[i]; i++) {
+            word[i] = toupper(word[i]);
+        }
+        int h = hash(word);
+
+        if ( (*hashTable)[h].word[0] == '\0') {
+            strcpy((*hashTable)[h].word, word);
+
+            (*hashTable)[h].frequency = 1;
+            (*noOfWords) = (*noOfWords) + 1;
+        } else if (strcmp((*hashTable)[h].word, word) == 0) {
+            // increment frequency count for existing word
+            (*hashTable)[h].frequency++;
+        } else {
+            // handle hash collision by linear probing
+            for (int j = (h + 1) % MAX_NUM_WORDS; j != h; j = (j + 1) % MAX_NUM_WORDS) {
+                if ( (*hashTable)[j].word[0] == '\0') {
+                    strcpy( (*hashTable)[j].word, word);
+
+                    (*hashTable)[j].frequency= 1;
+                    (*noOfWords) = (*noOfWords) + 1;
+
+                    break;
+                } else if (strcmp((*hashTable)[j].word, word) == 0) {
+                    (*hashTable)[j].frequency++;
+                    break;
+                }
+            }
+        }
+    }
+    fclose(fp);
+}
+
+void sortHashTable(WordFreqPair** hashTable) {
+    // sort table in descending order
+    int maxFreq;
+
+    for ( int i = 0; i < MAX_NUM_WORDS; i++) {
+        maxFreq = (*hashTable)[i].frequency;
+        for ( int j = i + 1; j < MAX_NUM_WORDS; j++) {
+            if ( (*hashTable)[j].frequency > maxFreq) {
+                WordFreqPair tmp = (*hashTable)[i];
+                (*hashTable)[i] = (*hashTable)[j];
+                (*hashTable)[j] = tmp;
+                maxFreq = (*hashTable)[i].frequency;
+            }
+        }
+    }
+}
+
 void* thread_function(void* args) {
 
     ThreadArgs* thread_args = (ThreadArgs*)args;
@@ -29,29 +115,16 @@ void* thread_function(void* args) {
     // the function that will be run by each thread
     printf("Hello from thread %d\n", threadNo);
 
-    // Read file
-    FILE *fp;
-    char word[MAX_WORD_LEN];
+    WordFreqPair* hashTable = (WordFreqPair*) malloc( MAX_NUM_WORDS * sizeof(WordFreqPair));
+    int noOfWords;
 
-    fp = fopen(infile, "r");
-    if (fp == NULL) {
-        printf("Failed to open file %s\n", infile);
-    }
+    readAndCreateHashTable(infile, &noOfWords, &hashTable);
 
-    while (fscanf(fp, "%s", word) != EOF) {
-        printf("Word: %s\n", word);
-    }
-
-    fclose(fp);
+    sortHashTable(&hashTable);    
 
     for (int j = 0; j < K; j++) {
-        WordFreqPair* pair = (WordFreqPair*) malloc(sizeof(WordFreqPair));;
-        // initialize the members of the struct
-        strncpy(pair->word, "example", MAX_WORD_LEN);
-        pair->frequency = threadNo*j;
-
         // child process writes to the shared memory
-        wordFreqPairs[threadNo][j] = *pair;
+        wordFreqPairs[threadNo][j] = hashTable[j];
     }
 
     free(args);
@@ -123,12 +196,65 @@ int main(int argc, char* argv[]) {
 
     printf("Threads finished\n");
 
-    for (int i = 0; i < N; i++) {
-        for (int j = 0; j < K; j++) {
-            // read from the shared memory object
-            printf("Received message word : %s\n", wordFreqPairs[i][j].word);
-            printf("Received message freq : %d\n", wordFreqPairs[i][j].frequency);
+    //Initialize parentTable to find top K words
+    WordFreqPair* parentTable = ( WordFreqPair* ) malloc( N*K*sizeof(WordFreqPair) );
+    int tableSize = N*K;
+
+    for ( int i = 0; i < tableSize; i++ ) {
+        parentTable[i].word[0] = '\0'; //Set first characters to null so that any word is empty for now.
+        parentTable[i].frequency = 0;
+    }
+
+    //Read the shared memory and count words
+    int wordCount = 0;
+    for ( int i = 0;  i <N; i++ ) {
+        for ( int j = 0; j <K; j++ ) {
+
+            char* word = wordFreqPairs[i][j].word;
+            int freq = wordFreqPairs[i][j].frequency;
+            int h = hash(word);
+
+            if ( (parentTable)[h].word[0] == '\0') {
+                strcpy((parentTable)[h].word, word);
+
+                (parentTable)[h].frequency = freq;
+                wordCount = wordCount + 1;
+            } else if (strcmp((parentTable)[h].word, word) == 0) {
+                // increment frequency count for existing word
+                parentTable[h].frequency = parentTable[h].frequency + freq ;
+            } else {
+                // handle hash collision by linear probing
+                for (int a = (h + 1) % MAX_NUM_WORDS; a != h; a = (a + 1) % MAX_NUM_WORDS) {
+                    if ( (parentTable)[a].word[0] == '\0') {
+                        strcpy( (parentTable)[a].word, word);
+
+                        (parentTable)[a].frequency= 1;
+                        wordCount = wordCount + 1;
+
+                        break;
+                    } else if (strcmp((parentTable)[a].word, word) == 0) {
+                        parentTable[a].frequency = parentTable[a].frequency + freq ;
+                        break;
+                    }
+                }
+            }
         }
+    }
+
+    //Sort table
+    sortHashTable(&parentTable);
+    //Time to output
+    FILE* ofp;
+    ofp = fopen(outfile, "w");
+
+    if (ofp == NULL) {
+        printf("Error opening file!\n");
+        return 1;
+    }
+
+    for (int i = 0; i < K; i++) {
+        fprintf(ofp,"%s", parentTable[i].word);
+        fprintf(ofp," %d\n", parentTable[i].frequency);
     }
 
 

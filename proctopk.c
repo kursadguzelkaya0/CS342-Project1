@@ -100,26 +100,43 @@ void sortHashTable(WordFreqPair** hashTable) {
 }
 
 
-int main( int argc, char* argv[] ) {
+int main(int argc, char* argv[]) {
+    int K, N;
+    char* outfile;
+    char** infiles;
 
-    int k = 5; // number of words to find
-    int n = 3; // number of input files
-    char inFile1[] = "in1.txt";  // input file name
-    char inFile2[] = "in2.txt";  // input file name
-    char inFile3[] = "in3.txt";  // input file name
+    // check for correct number of arguments
+    if (argc < 5) {
+        printf("Usage: %s <K> <outfile> <N> <infile1> .... <infileN>\n", argv[0]);
+        return 1;
+    }
+
+    // read in K
+    K = atoi(argv[1]);
+
+    // read in outfile
+    outfile = argv[2];
+
+    // read in N
+    N = atoi(argv[3]);
+
+    // allocate space for input file names
+    infiles = (char**) malloc(N * sizeof(char*));
+    if (!infiles) {
+        printf("Error: Could not allocate memory for input files.\n");
+        return 1;
+    }
+
+    // read in input file names
+    for (int i = 0; i < N; i++) {
+        infiles[i] = argv[i + 4];
+    }
     
-    long shm_size = n * k * sizeof(WordFreqPair);
-
-    char inputFiles[3][20] = {
-        "in1.txt",
-        "in2.txt",
-        "in3.txt"
-    };
-
+    long shm_size = N * K * sizeof(WordFreqPair);
 
     int shm_fd;
     pid_t pid;
-    WordFreqPair (*wordFreqPairs)[k];
+    WordFreqPair (*wordFreqPairs)[K];
 
 
     // create a shared memory object
@@ -139,7 +156,7 @@ int main( int argc, char* argv[] ) {
         exit(1);
     }   
 
-    for (int i=0; i<n; i++) {
+    for (int i=0; i<N; i++) {
         pid = fork();
 
         if (pid == -1) {
@@ -152,11 +169,11 @@ int main( int argc, char* argv[] ) {
             WordFreqPair* hashTable = (WordFreqPair*) malloc( MAX_NUM_WORDS * sizeof(WordFreqPair));
             int noOfWords;
 
-            readAndCreateHashTable(inputFiles[i], &noOfWords, &hashTable);
+            readAndCreateHashTable(infiles[i], &noOfWords, &hashTable);
         
             sortHashTable(&hashTable);    
             
-            for (int j = 0; j < k; j++) {
+            for (int j = 0; j < K; j++) {
                 printf("index of word in hashtable %d\n", j);
                 printf("word : %s\n", hashTable[j].word);
                 printf("freq : %d\n", hashTable[j].frequency);
@@ -174,21 +191,21 @@ int main( int argc, char* argv[] ) {
 
             return 0;
         } else {
-            // parent process waits for the child to finish
-            wait(NULL);
-
             // This is the parent process
             printf("Hello from parent process!\n");
         }
 
     }
 
-    // parent process waits for the child to finish
-    wait(NULL);
+    printf("Parent waiting for children...\n");
+    for (int i = 0; i < N; i++) {
+        wait(NULL); // wait for any child process to finish
+    }
+    printf("All children finished\n");
 
     //Initialize parentTable to find top K words
-    WordFreqPair* parentTable = ( WordFreqPair* ) malloc( n*k*sizeof(WordFreqPair) );
-    int tableSize = n*k;
+    WordFreqPair* parentTable = ( WordFreqPair* ) malloc( N*K*sizeof(WordFreqPair) );
+    int tableSize = N*K;
 
     for ( int i = 0; i < tableSize; i++ ) {
         parentTable[i].word[0] = '\0'; //Set first characters to null so that any word is empty for now.
@@ -197,8 +214,8 @@ int main( int argc, char* argv[] ) {
 
     //Read the shared memory and count words
     int wordCount = 0;
-    for ( int i = 0;  i <n; i++ ) {
-        for ( int j = 0; j <k; j++ ) {
+    for ( int i = 0;  i <N; i++ ) {
+        for ( int j = 0; j <K; j++ ) {
 
             char* word = wordFreqPairs[i][j].word;
             int freq = wordFreqPairs[i][j].frequency;
@@ -235,14 +252,14 @@ int main( int argc, char* argv[] ) {
     sortHashTable(&parentTable);
     //Time to output
     FILE* ofp;
-    ofp = fopen("output.txt", "w");
+    ofp = fopen(outfile, "w");
 
     if (ofp == NULL) {
         printf("Error opening file!\n");
         return 1;
     }
 
-    for (int i = 0; i < wordCount; i++) {
+    for (int i = 0; i < K; i++) {
             fprintf(ofp,"%s", parentTable[i].word);
             fprintf(ofp," %d\n", parentTable[i].frequency);
     }

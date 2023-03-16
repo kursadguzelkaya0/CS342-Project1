@@ -1,0 +1,5 @@
+KG 8
+ABC 8
+QWE 6
+AQ3 5
+DEF 4
