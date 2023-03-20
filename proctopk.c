@@ -289,8 +289,11 @@ int main(int argc, char* argv[]) {
     }
 
     for (int i = 0; i < K; i++) {
+        if( parentTable[i].frequency >0 ) {
             fprintf(ofp,"%s", parentTable[i].word);
             fprintf(ofp," %d\n", parentTable[i].frequency);
+
+        }
     }
 
     // unmap the shared memory object from the parent process
