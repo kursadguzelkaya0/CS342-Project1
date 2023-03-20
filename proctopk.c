@@ -35,18 +35,7 @@ void readAndCreateHashTable(char* filename, int* noOfWords, WordFreqPair** hashT
     FILE *fp;
     char word[MAX_WORD_LEN];
 
-    // int size = 1000;
 
-    // if ( *noOfWords > (size * 0.7 ) ) {
-    //     WordFreqPair** tmp = realloc(hashTable, size * 2 );
-    //     if ( tmp == NULL ) {
-    //         printf("Error reallocating for new table");
-    //     }
-    //     else {
-    //         size = size *2;
-    //         hashTable = tmp;
-    //     }
-    // }
 
     //Initialize all elements
     for ( int i = 0; i < MAX_NUM_WORDS; i++ ) {
@@ -63,12 +52,28 @@ void readAndCreateHashTable(char* filename, int* noOfWords, WordFreqPair** hashT
 
     //Read the file and count words
     (*noOfWords) = 0;
+    int totalCount = 0;
+    int size = 1000;
     while (fscanf(fp, "%s", word) != EOF) {
+
+
+        if ( totalCount > (size * 0.7 ) ) {
+            WordFreqPair* tmp = realloc(*hashTable, size * 2 );
+            if ( tmp == NULL ) {
+                printf("Error reallocating for new table");
+            }
+            else {
+                printf("Reallocation successful");
+                size = size * 2;
+                *hashTable = tmp;
+            }
+        }
         for(int i = 0; word[i]; i++) {
             word[i] = toupper(word[i]);
         }
-        int h = hash(word);
 
+        int h = hash(word);
+        totalCount++;
         if ( (*hashTable)[h].word[0] == '\0') {
             strcpy((*hashTable)[h].word, word);
 
@@ -97,14 +102,14 @@ void readAndCreateHashTable(char* filename, int* noOfWords, WordFreqPair** hashT
     fclose(fp);
 }
 
-void sortHashTable(WordFreqPair** hashTable) {
+void sortHashTable(WordFreqPair** hashTable ){
     // sort table in descending order
     int maxFreq;
 
     for ( int i = 0; i < MAX_NUM_WORDS; i++) {
         maxFreq = (*hashTable)[i].frequency;
         for ( int j = i + 1; j < MAX_NUM_WORDS; j++) {
-            if ( (*hashTable)[j].frequency > maxFreq || ((*hashTable)[j].frequency == (*hashTable)[i].frequency && strcmp((*hashTable)[i].word, (*hashTable)[j].word) < 0)) {
+            if ( (*hashTable)[j].frequency > maxFreq || ( (*hashTable)[j].frequency == maxFreq && strcmp((*hashTable)[j].word, (*hashTable)[i].word) < 0)) {
                 WordFreqPair tmp = (*hashTable)[i];
                 (*hashTable)[i] = (*hashTable)[j];
                 (*hashTable)[j] = tmp;
@@ -127,7 +132,6 @@ int main(int argc, char* argv[]) {
 
     // read in K
     K = atoi(argv[1]);
-
     // read in outfile
     outfile = argv[2];
 
@@ -144,9 +148,8 @@ int main(int argc, char* argv[]) {
     // read in input file names
     for (int i = 0; i < N; i++) {
         infiles[i] = argv[i + 4];
-        printf("saasasa::: %s\n", argv[i+4]);
     }
-    
+    //
     long shm_size = N * MAX_K * sizeof(WordFreqPair);
 
     int shm_fd;
@@ -177,19 +180,20 @@ int main(int argc, char* argv[]) {
             return 1;
         } else if (pid == 0) {
             // This is the child process
-            printf("Hello from child process!\n");
+            //printf("Hello from child process!\n");
 
             WordFreqPair* hashTable = (WordFreqPair*) malloc( MAX_NUM_WORDS * sizeof(WordFreqPair));
             int noOfWords;
 
             readAndCreateHashTable(infiles[i], &noOfWords, &hashTable);
-        
-            sortHashTable(&hashTable);    
-            
+
+            sortHashTable(&hashTable);
+
+
             for (int j = 0; j < K; j++) {
-                printf("index of word in hashtable %d\n", j);
-                printf("word : %s\n", hashTable[j].word);
-                printf("freq : %d\n", hashTable[j].frequency);
+                //printf("index of word in hashtable %d\n", j);
+                //printf("word : %s\n", hashTable[j].word);
+                //printf("freq : %d\n", hashTable[j].frequency);
                 if (hashTable[j].frequency > 0) {
                     // child process writes to the shared memory
                     wordFreqPairs[i][j] = hashTable[j];
@@ -217,8 +221,7 @@ int main(int argc, char* argv[]) {
     printf("All children finished\n");
 
     //Initialize parentTable to find top K words
-    WordFreqPair* parentTable = ( WordFreqPair* ) malloc( N*K*sizeof(WordFreqPair) );
-    printf("asdasdasdasda\n");
+    WordFreqPair* parentTable = ( WordFreqPair* ) malloc( MAX_NUM_WORDS * 10* sizeof( WordFreqPair) );
 
     int tableSize = N*K;
 
@@ -265,6 +268,7 @@ int main(int argc, char* argv[]) {
 
     //Sort table
     sortHashTable(&parentTable);
+
     //Time to output
     FILE* ofp;
     ofp = fopen(outfile, "w");
@@ -275,7 +279,6 @@ int main(int argc, char* argv[]) {
     }
 
     for (int i = 0; i < K; i++) {
-            printf("%s", parentTable[i].word);
             fprintf(ofp,"%s", parentTable[i].word);
             fprintf(ofp," %d\n", parentTable[i].frequency);
     }
