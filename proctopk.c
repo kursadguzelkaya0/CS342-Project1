@@ -29,7 +29,7 @@ int hash(char *word) {
     return hashedRes;
 }
 
-void readAndCreateHashTable(char* filename, int* noOfWords, WordFreqPair** hashTable) {
+void readAndCreateHashTable(char* filename, int* noOfWords, WordFreqPair** hashTable, int* size) {
 
     // Read file
     FILE *fp;
@@ -53,18 +53,16 @@ void readAndCreateHashTable(char* filename, int* noOfWords, WordFreqPair** hashT
     //Read the file and count words
     (*noOfWords) = 0;
     int totalCount = 0;
-    int size = 1000;
     while (fscanf(fp, "%s", word) != EOF) {
 
-
-        if ( totalCount > (size * 0.7 ) ) {
-            WordFreqPair* tmp = realloc(*hashTable, size * 2 );
+        if ( totalCount > (*size * 0.7 ) ) {
+            WordFreqPair* tmp = realloc(*hashTable, *size * 2 *sizeof(WordFreqPair));
             if ( tmp == NULL ) {
                 printf("Error reallocating for new table");
             }
             else {
                 printf("Reallocation successful");
-                size = size * 2;
+                *size = *size * 2;
                 *hashTable = tmp;
             }
         }
@@ -73,6 +71,10 @@ void readAndCreateHashTable(char* filename, int* noOfWords, WordFreqPair** hashT
         }
 
         int h = hash(word);
+        if (h > 1000 )  {
+            printf("h is %d\n", h);
+
+        }
         totalCount++;
         if ( (*hashTable)[h].word[0] == '\0') {
             strcpy((*hashTable)[h].word, word);
@@ -102,14 +104,15 @@ void readAndCreateHashTable(char* filename, int* noOfWords, WordFreqPair** hashT
     fclose(fp);
 }
 
-void sortHashTable(WordFreqPair** hashTable ){
+void sortHashTable(WordFreqPair** hashTable, int size ){
     // sort table in descending order
     int maxFreq;
 
-    for ( int i = 0; i < MAX_NUM_WORDS; i++) {
+    for ( int i = 0; i < size; i++) {
         maxFreq = (*hashTable)[i].frequency;
-        for ( int j = i + 1; j < MAX_NUM_WORDS; j++) {
+        for ( int j = i + 1; j < size; j++) {
             if ( (*hashTable)[j].frequency > maxFreq || ( (*hashTable)[j].frequency == maxFreq && strcmp((*hashTable)[j].word, (*hashTable)[i].word) < 0)) {
+                if ((*hashTable)[j].frequency == 64001) { printf("Onun indexi şu %d",j);}
                 WordFreqPair tmp = (*hashTable)[i];
                 (*hashTable)[i] = (*hashTable)[j];
                 (*hashTable)[j] = tmp;
@@ -181,19 +184,25 @@ int main(int argc, char* argv[]) {
         } else if (pid == 0) {
             // This is the child process
             //printf("Hello from child process!\n");
-
+            int size = 1000;
             WordFreqPair* hashTable = (WordFreqPair*) malloc( MAX_NUM_WORDS * sizeof(WordFreqPair));
             int noOfWords;
 
-            readAndCreateHashTable(infiles[i], &noOfWords, &hashTable);
+            readAndCreateHashTable(infiles[i], &noOfWords, &hashTable, &size);
 
-            sortHashTable(&hashTable);
+//            printf("size after creation is%d\n", size);
+//            for (int a = 0; a < size; a++ ) {
+//                if ( hashTable[a].frequency != 0 ) {
+//                    printf("word is %s\n", hashTable[a].word);
+//                }
+//            }
+            sortHashTable(&hashTable, size );
 
 
             for (int j = 0; j < K; j++) {
-                //printf("index of word in hashtable %d\n", j);
-                //printf("word : %s\n", hashTable[j].word);
-                //printf("freq : %d\n", hashTable[j].frequency);
+                printf("index of word in hashtable %d\n", j);
+                printf("word : %s\n", hashTable[j].word);
+                printf("freq : %d\n", hashTable[j].frequency);
                 if (hashTable[j].frequency > 0) {
                     // child process writes to the shared memory
                     wordFreqPairs[i][j] = hashTable[j];
@@ -221,11 +230,12 @@ int main(int argc, char* argv[]) {
     printf("All children finished\n");
 
     //Initialize parentTable to find top K words
-    WordFreqPair* parentTable = ( WordFreqPair* ) malloc( MAX_NUM_WORDS * 10* sizeof( WordFreqPair) );
+    int maxTableSize = MAX_NUM_WORDS*10;
 
-    int tableSize = N*K;
+    WordFreqPair* parentTable = ( WordFreqPair* ) malloc( maxTableSize* sizeof( WordFreqPair) );
 
-    for ( int i = 0; i < tableSize; i++ ) {
+
+    for ( int i = 0; i < maxTableSize; i++ ) {
         parentTable[i].word[0] = '\0'; //Set first characters to null so that any word is empty for now.
         parentTable[i].frequency = 0;
     }
@@ -267,7 +277,7 @@ int main(int argc, char* argv[]) {
     }
 
     //Sort table
-    sortHashTable(&parentTable);
+    sortHashTable(&parentTable, maxTableSize);
 
     //Time to output
     FILE* ofp;
