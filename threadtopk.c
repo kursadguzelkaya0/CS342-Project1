@@ -15,12 +15,13 @@ typedef struct {
 } WordFreqPair;
 
 typedef struct {
-    WordFreqPair** wordFreqPairs;
     char* infile;
     int threadNo;
     int K;
     int size;
 } ThreadArgs;
+
+WordFreqPair** wordFreqPairs;
 
 
 int hash(char *word) {
@@ -123,7 +124,6 @@ void sortHashTable(WordFreqPair** hashTable, int size) {
 void* thread_function(void* args) {
 
     ThreadArgs* thread_args = (ThreadArgs*)args;
-    WordFreqPair** wordFreqPairs = thread_args->wordFreqPairs;
     int threadNo = thread_args->threadNo;
     char* infile = thread_args->infile;
     int K = thread_args->K;
@@ -181,7 +181,7 @@ int main(int argc, char* argv[]) {
     }
 
     // allocate space for result
-    WordFreqPair** wordFreqPairs = (WordFreqPair*) malloc(N*sizeof(WordFreqPair*));
+    wordFreqPairs = (WordFreqPair*) malloc(N*sizeof(WordFreqPair*));
     for (int i = 0; i < N; i++) {
         wordFreqPairs[i] = malloc(K * sizeof(WordFreqPair));
     }
@@ -191,7 +191,6 @@ int main(int argc, char* argv[]) {
 
     for (int i = 0; i < N; i++) {
         ThreadArgs* args = (ThreadArgs*) malloc(sizeof(ThreadArgs));
-        args->wordFreqPairs = wordFreqPairs;
         args->infile = infiles[i];
         args->K = K;
         args->threadNo = i;
@@ -221,7 +220,7 @@ int main(int argc, char* argv[]) {
         parentTable[i].frequency = 0;
     }
 
-    //Read the shared memory and count words
+    //Read the global array and count words
     int wordCount = 0;
     for ( int i = 0;  i <N; i++ ) {
         for ( int j = 0; j <K; j++ ) {
