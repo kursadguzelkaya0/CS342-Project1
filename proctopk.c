@@ -9,6 +9,7 @@
 
 #define MAX_WORD_LEN 64
 #define MAX_NUM_WORDS 1000
+#define MAX_K 1000
 #define SNAME "/myshm"
 
 typedef struct {
@@ -16,6 +17,7 @@ typedef struct {
     int frequency;
 } WordFreqPair;
 
+WordFreqPair (*wordFreqPairs)[MAX_K];
 
 int hash(char *word) {
     int hashedRes = 0;
@@ -132,12 +134,10 @@ int main(int argc, char* argv[]) {
         infiles[i] = argv[i + 4];
     }
     
-    long shm_size = N * K * sizeof(WordFreqPair);
+    long shm_size = N * MAX_K * sizeof(WordFreqPair);
 
     int shm_fd;
     pid_t pid;
-    WordFreqPair (*wordFreqPairs)[K];
-
 
     // create a shared memory object
     shm_fd = shm_open(SNAME, O_CREAT | O_RDWR, 0666);
@@ -260,6 +260,7 @@ int main(int argc, char* argv[]) {
     }
 
     for (int i = 0; i < K; i++) {
+            printf("%s", parentTable[i].word);
             fprintf(ofp,"%s", parentTable[i].word);
             fprintf(ofp," %d\n", parentTable[i].frequency);
     }
