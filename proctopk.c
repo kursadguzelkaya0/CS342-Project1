@@ -18,6 +18,7 @@ typedef struct {
 } WordFreqPair;
 
 WordFreqPair (*wordFreqPairs)[MAX_K];
+char** infiles;
 
 int hash(char *word) {
     int hashedRes = 0;
@@ -34,6 +35,18 @@ void readAndCreateHashTable(char* filename, int* noOfWords, WordFreqPair** hashT
     FILE *fp;
     char word[MAX_WORD_LEN];
 
+    // int size = 1000;
+
+    // if ( *noOfWords > (size * 0.7 ) ) {
+    //     WordFreqPair** tmp = realloc(hashTable, size * 2 );
+    //     if ( tmp == NULL ) {
+    //         printf("Error reallocating for new table");
+    //     }
+    //     else {
+    //         size = size *2;
+    //         hashTable = tmp;
+    //     }
+    // }
 
     //Initialize all elements
     for ( int i = 0; i < MAX_NUM_WORDS; i++ ) {
@@ -91,7 +104,7 @@ void sortHashTable(WordFreqPair** hashTable) {
     for ( int i = 0; i < MAX_NUM_WORDS; i++) {
         maxFreq = (*hashTable)[i].frequency;
         for ( int j = i + 1; j < MAX_NUM_WORDS; j++) {
-            if ( (*hashTable)[j].frequency > maxFreq) {
+            if ( (*hashTable)[j].frequency > maxFreq || ((*hashTable)[j].frequency == (*hashTable)[i].frequency && strcmp((*hashTable)[i].word, (*hashTable)[j].word) < 0)) {
                 WordFreqPair tmp = (*hashTable)[i];
                 (*hashTable)[i] = (*hashTable)[j];
                 (*hashTable)[j] = tmp;
@@ -105,7 +118,6 @@ void sortHashTable(WordFreqPair** hashTable) {
 int main(int argc, char* argv[]) {
     int K, N;
     char* outfile;
-    char** infiles;
 
     // check for correct number of arguments
     if (argc < 5) {
@@ -132,6 +144,7 @@ int main(int argc, char* argv[]) {
     // read in input file names
     for (int i = 0; i < N; i++) {
         infiles[i] = argv[i + 4];
+        printf("saasasa::: %s\n", argv[i+4]);
     }
     
     long shm_size = N * MAX_K * sizeof(WordFreqPair);
@@ -205,6 +218,8 @@ int main(int argc, char* argv[]) {
 
     //Initialize parentTable to find top K words
     WordFreqPair* parentTable = ( WordFreqPair* ) malloc( N*K*sizeof(WordFreqPair) );
+    printf("asdasdasdasda\n");
+
     int tableSize = N*K;
 
     for ( int i = 0; i < tableSize; i++ ) {
