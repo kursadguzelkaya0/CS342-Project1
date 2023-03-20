@@ -289,6 +289,7 @@ int main(int argc, char* argv[]) {
     }
 
     for (int i = 0; i < K; i++) {
+        //if there are less words than wanted
         if( parentTable[i].frequency >0 ) {
             fprintf(ofp,"%s", parentTable[i].word);
             fprintf(ofp," %d\n", parentTable[i].frequency);
