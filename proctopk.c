@@ -71,10 +71,7 @@ void readAndCreateHashTable(char* filename, int* noOfWords, WordFreqPair** hashT
         }
 
         int h = hash(word);
-        if (h > 1000 )  {
-            printf("h is %d\n", h);
 
-        }
         totalCount++;
         if ( (*hashTable)[h].word[0] == '\0') {
             strcpy((*hashTable)[h].word, word);
