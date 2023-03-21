@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
-
+#include <sys/time.h>
 
 
 #define MAX_WORD_LEN 64
@@ -179,6 +179,12 @@ int main(int argc, char* argv[]) {
     for (int i = 0; i < N; i++) {
         infiles[i] = argv[i + 4];
     }
+    // start the timer
+    time_t t;
+    srand((unsigned) time(&t));
+
+    struct timeval starttime, endtime;
+    gettimeofday(&starttime, NULL);
 
     // allocate space for result
     wordFreqPairs = (WordFreqPair*) malloc(N*sizeof(WordFreqPair*));
@@ -276,5 +282,11 @@ int main(int argc, char* argv[]) {
 
 
     free(infiles);
+    gettimeofday(&endtime, NULL);
+    // Calculate elapsed time
+    long int elapsed;
+    elapsed= (endtime.tv_sec - starttime.tv_sec) * 1000000L +
+             (endtime.tv_usec - starttime.tv_usec);
+    printf("Elapsed time: %ld microseconds\n", elapsed);
     return 0;
 }

@@ -153,10 +153,9 @@ int main(int argc, char* argv[]) {
     time_t t;
     srand((unsigned) time(&t));
 
-    struct timeval currTime;
-    gettimeofday(&currTime, NULL);
-    long before = currTime.tv_usec;
-    //
+    struct timeval starttime, endtime;
+    gettimeofday(&starttime, NULL);
+
     long shm_size = N * MAX_K * sizeof(WordFreqPair);
 
     int shm_fd;
@@ -219,9 +218,7 @@ int main(int argc, char* argv[]) {
                 exit(1);
             }
 
-            gettimeofday(&currTime, NULL);
-            long after= currTime.tv_usec;
-            printf("\nThe execution took: %ld ms \n", after - before);
+
             return 0;
         } else {
             // This is the parent process
@@ -321,6 +318,11 @@ int main(int argc, char* argv[]) {
         perror("shm_unlink");
         exit(1);
     }
-
+    gettimeofday(&endtime, NULL);
+    // Calculate elapsed time
+    long int elapsed;
+    elapsed= (endtime.tv_sec - starttime.tv_sec) * 1000000L +
+                   (endtime.tv_usec - starttime.tv_usec);
+    printf("Elapsed time: %ld microseconds\n", elapsed);
     return 0;
 }
