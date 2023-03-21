@@ -6,7 +6,8 @@
 #include <ctype.h>
 #include <sys/mman.h>
 #include <fcntl.h>
-
+#include <time.h>
+#include <sys/time.h>
 #define MAX_WORD_LEN 64
 #define MAX_NUM_WORDS 1000
 #define MAX_K 1000
@@ -149,6 +150,12 @@ int main(int argc, char* argv[]) {
     for (int i = 0; i < N; i++) {
         infiles[i] = argv[i + 4];
     }
+    time_t t;
+    srand((unsigned) time(&t));
+
+    struct timeval currTime;
+    gettimeofday(&currTime, NULL);
+    long before = currTime.tv_usec;
     //
     long shm_size = N * MAX_K * sizeof(WordFreqPair);
 
@@ -212,6 +219,9 @@ int main(int argc, char* argv[]) {
                 exit(1);
             }
 
+            gettimeofday(&currTime, NULL);
+            long after= currTime.tv_usec;
+            printf("\nThe execution took: %ld ms \n", after - before);
             return 0;
         } else {
             // This is the parent process
